@@ -172,10 +172,15 @@ int main() {
       0         // disable mute
     };
 
-    // uint8_t i2c_cmd_transition_config[2] = {
-    //   0x05,     // Transition control
-    //   0         //
-    // };
+    uint8_t i2c_cmd_vol[2] = {
+      0x07,         // DAC Channel A vol
+      0b00010100,   // -10dB
+    };
+
+    uint8_t i2c_cmd_transition_config[2] = {
+      0x05,     // Transition control
+      1         // de-emph filter
+    };
 
     uint8_t i2c_cmd_power_up[2] = {
       0x02,     // Power control MAP
@@ -225,6 +230,23 @@ int main() {
         false
     );
     printf("Codec: %d\n", r);
+
+    r = i2c_write_blocking(
+        I2C_PORT,
+        i2c_addr,
+        i2c_cmd_transition_config,
+        2,
+        false
+    );
+
+    r = i2c_write_blocking(
+        I2C_PORT,
+        i2c_addr,
+        i2c_cmd_vol,
+        2,
+        false
+    );
+    printf("Vol: %d\n", r);
 
     sleep_ms(1);
 
