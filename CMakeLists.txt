@@ -60,8 +60,8 @@ pico_set_program_version(i2s_example "1.0.1")
 # no_flash means the target is to run from RAM
 # pico_set_binary_type(i2s_test no_flash)
 
-pico_enable_stdio_uart(i2s_example 1)
-pico_enable_stdio_usb(i2s_example 0)
+pico_enable_stdio_uart(i2s_example 0)
+pico_enable_stdio_usb(i2s_example 1)
 
 # Add the standard library to the build
 target_link_libraries(i2s_example pico_stdlib)
