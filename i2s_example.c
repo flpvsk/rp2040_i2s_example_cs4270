@@ -50,7 +50,11 @@ const uint LED_PIN = PICO_DEFAULT_LED_PIN;
 
 static __attribute__((aligned(8))) pio_i2s i2s;
 
-static void process_audio(const int32_t* input, int32_t* output, size_t num_frames) {
+static void process_audio(
+    const int32_t* input,
+    int32_t* output,
+    size_t num_frames
+) {
     // Just copy the input to the output
     for (size_t i = 0; i < num_frames * 2; i++) {
         output[i] = input[i];
@@ -58,18 +62,37 @@ static void process_audio(const int32_t* input, int32_t* output, size_t num_fram
 }
 
 static void dma_i2s_in_handler(void) {
-    /* We're double buffering using chained TCBs. By checking which buffer the
-     * DMA is currently reading from, we can identify which buffer it has just
-     * finished reading (the completion of which has triggered this interrupt).
+    /* We're double buffering using chained TCBs. By
+     * checking which buffer the DMA is currently reading
+     * from, we can identify which buffer it has just
+     * finished reading (the completion of which has
+     * triggered this interrupt).
      */
-    if (*(int32_t**)dma_hw->ch[i2s.dma_ch_in_ctrl].read_addr == i2s.input_buffer) {
-        // It is inputting to the second buffer so we can overwrite the first
-        process_audio(i2s.input_buffer, i2s.output_buffer, AUDIO_BUFFER_FRAMES);
+    int32_t* dma_addr = *(int32_t**)dma_hw->ch[i2s.dma_ch_in_ctrl].read_addr;
+    if (dma_addr == i2s.input_buffer) {
+        // It is inputting to the second buffer so we can
+        // overwrite the first
+        process_audio(
+            i2s.input_buffer,
+            i2s.output_buffer,
+            AUDIO_BUFFER_FRAMES
+        );
     } else {
-        // It is currently inputting the first buffer, so we write to the second
-        process_audio(&i2s.input_buffer[STEREO_BUFFER_SIZE], &i2s.output_buffer[STEREO_BUFFER_SIZE], AUDIO_BUFFER_FRAMES);
+        // It is currently inputting the first buffer, so we
+        // write to the second
+        process_audio(
+            &i2s.input_buffer[STEREO_BUFFER_SIZE],
+            &i2s.output_buffer[STEREO_BUFFER_SIZE],
+            AUDIO_BUFFER_FRAMES
+        );
     }
     dma_hw->ints0 = 1u << i2s.dma_ch_in_data;  // clear the IRQ
+    printf(
+        "dma callback complete:%p ...in: %p ...out: %p\n",
+        dma_addr,
+        i2s.input_buffer,
+        i2s.output_buffer
+    );
 }
 
 void blink_it() {
@@ -138,7 +161,7 @@ int main() {
     uint8_t i2c_cmd_codec_config[2] = {
       0x04,     // ADC & DAC control MAP
       (
-        (1 << 5) |  // enable digital loopback
+        // (1 << 5) |  // enable digital loopback
         (1 << 3) |  // dac mode i2s
         1           // adc mode i2s
       )

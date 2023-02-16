@@ -30,7 +30,7 @@
 const i2s_config i2s_config_default = {
   48000,
   384, // 256,
-  32,
+  24,
   4,
   0,
   1,
@@ -128,28 +128,34 @@ static void dma_double_buffer_init(pio_i2s* i2s, void (*dma_handler)(void)) {
     channel_config_set_chain_to(&c, i2s->dma_ch_in_ctrl);
     channel_config_set_dreq(&c, pio_get_dreq(i2s->pio, i2s->sm_din, false));
 
-    dma_channel_configure(i2s->dma_ch_in_data,
-                          &c,
-                          NULL,                         // Will be set by ctrl chan
-                          &i2s->pio->rxf[i2s->sm_din],  // Source pointer
-                          STEREO_BUFFER_SIZE,           // Number of transfers
-                          false                         // Don't start yet
+    dma_channel_configure(
+        i2s->dma_ch_in_data,
+        &c,
+        NULL,                         // Will be set by ctrl chan
+        &i2s->pio->rxf[i2s->sm_din],  // Source pointer
+        STEREO_BUFFER_SIZE,           // Number of transfers
+        false                         // Don't start yet
     );
 
-    // Input channel triggers the DMA interrupt handler, hopefully these stay
-    // in perfect sync with the output.
+    // Input channel triggers the DMA interrupt handler,
+    // hopefully these stay in perfect sync with the output.
     dma_channel_set_irq0_enabled(i2s->dma_ch_in_data, true);
     irq_set_exclusive_handler(DMA_IRQ_0, dma_handler);
     irq_set_enabled(DMA_IRQ_0, true);
 
     // Enable all the dma channels
-    dma_channel_start(i2s->dma_ch_out_ctrl);  // This will trigger-start the out chan
-    dma_channel_start(i2s->dma_ch_in_ctrl);   // This will trigger-start the in chan
+    // This will trigger-start the out chan
+    dma_channel_start(i2s->dma_ch_out_ctrl);
+
+    // This will trigger-start the in chan
+    dma_channel_start(i2s->dma_ch_in_ctrl);
 }
 
-/* Initializes an I2S block (of 3 state machines) on the designated PIO.
- * NOTE! This does NOT START the PIO units. You must call i2s_program_start
- *       with the resulting i2s object!
+/* Initializes an I2S block (of 3 state machines) on the
+ * designated PIO.
+ *
+ * NOTE! This does NOT START the PIO units. You must call
+ * i2s_program_start with the resulting i2s object!
  */
 static void i2s_slave_program_init(PIO pio, const i2s_config* config, pio_i2s* i2s) {
     uint offset  = 0;
@@ -177,9 +183,11 @@ static void i2s_slave_program_init(PIO pio, const i2s_config* config, pio_i2s* i
     pio_sm_set_clkdiv_int_frac(pio, i2s->sm_din, clocks.sck_d, clocks.sck_f);
 }
 
-/* Initializes an I2S block (of 3 state machines) on the designated PIO.
- * NOTE! This does NOT START the PIO units. You must call i2s_program_start
- *       with the resulting i2s object!
+/* Initializes an I2S block (of 3 state machines) on the
+ * designated PIO.
+ *
+ * NOTE! This does NOT START the PIO units. You must call
+ * i2s_program_start with the resulting i2s object!
  */
 static void i2s_sync_program_init(PIO pio, const i2s_config* config, pio_i2s* i2s) {
     uint offset  = 0;
