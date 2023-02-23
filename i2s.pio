@@ -61,14 +61,14 @@ public entry_point:
                     ;        /--- LRCLK
                     ;        |/-- BCLK
 frameL:             ;        ||
-    set x, 30         side 0b00 ; start of Left frame
+    set x, 22         side 0b00 ; start of Left frame
     pull noblock      side 0b01 ; One clock after edge change with no data
 dataL:
     out pins, 1       side 0b00
     jmp x-- dataL     side 0b01
 
 frameR:
-    set x, 30         side 0b10
+    set x, 22         side 0b10
     pull noblock      side 0b11 ; One clock after edge change with no data
 dataR:
     out pins, 1       side 0b10
@@ -107,6 +107,55 @@ start_r:
   wait 0 pin 1                  ;
   pull noblock                  ;
   push noblock                  ;
+  wait 1 pin 1                  ;
+loop_r:
+  wait 0 pin 1                  ;
+  jmp pin continue_r            ;
+  jmp start_l                   ;
+continue_r:
+  out pins 1                    ;
+  wait 1 pin 1                  ;
+  in pins 1                     ;
+  jmp loop_r                    ;
+
+
+.program i2s_bidi_slave_lb
+; I2S audio bidirectional (input/output) block, both in slave mode.
+; Requires external BCK and LRCK, usually from the codec directly.
+; This block provides both the output and input components together,
+; so should not be used in combination with either of the other output or
+; input units on the same I2S bus.
+;
+; Input pin order: DIN, BCK, LRCK
+; Set JMP pin to LRCK.
+;
+; Clock synchronously with the system clock, or *at least* 4x the usual
+; bit clock for a given fs (e.g. for 48kHz 24-bit, clock at at least
+; (48000 * 24 * 2 (stereo)) * 4 = 9.216 MHz. Ideally 8x or more.
+
+public_entry_point:
+  wait 1 pin 2
+  wait 0 pin 2                  ; wait for LRCK to be a left frame start
+start_l:
+  wait 0 pin 1                  ;
+  ; pull noblock                  ;
+  ; push noblock                  ;
+  mov osr x
+  mov x isr
+  wait 1 pin 1                  ;
+loop_l:
+  wait 0 pin 1                  ;
+  jmp pin start_r               ;
+  out pins 1                    ;
+  wait 1 pin 1                  ;
+  in pins 1                     ;
+  jmp loop_l                    ;
+start_r:
+  wait 0 pin 1                  ;
+  ; pull noblock                  ;
+  ; push noblock                  ;
+  mov osr y
+  mov y isr
   wait 1 pin 1                  ;
 loop_r:
   wait 0 pin 1                  ;
@@ -200,6 +249,30 @@ static inline void i2s_out_master_program_init(PIO pio, uint8_t sm, uint8_t offs
 }
 
 static inline void i2s_bidi_slave_program_init(PIO pio, uint8_t sm, uint8_t offset, uint8_t dout_pin, uint8_t in_pin_base) {
+    pio_gpio_init(pio, dout_pin);
+    pio_gpio_init(pio, in_pin_base);
+    pio_gpio_init(pio, in_pin_base + 1);
+    pio_gpio_init(pio, in_pin_base + 2);
+
+    pio_sm_config sm_config = i2s_bidi_slave_program_get_default_config(offset);
+    sm_config_set_out_pins(&sm_config, dout_pin, 1);
+    sm_config_set_in_pins(&sm_config, in_pin_base);
+    sm_config_set_jmp_pin(&sm_config, in_pin_base + 2);
+    sm_config_set_out_shift(&sm_config, false, false, 0);
+    sm_config_set_in_shift(&sm_config, false, false, 0);
+    pio_sm_init(pio, sm, offset, &sm_config);
+
+    // Setup output pins
+    uint32_t pin_mask = (1u << dout_pin);
+    pio_sm_set_pins_with_mask(pio, sm, 0, pin_mask);  // zero output
+    pio_sm_set_pindirs_with_mask(pio, sm, pin_mask, pin_mask);
+
+    // Setup input pins
+    pin_mask = (7u << in_pin_base);  // Three input pins
+    pio_sm_set_pindirs_with_mask(pio, sm, 0, pin_mask);
+}
+
+static inline void i2s_bidi_slave_lb_program_init(PIO pio, uint8_t sm, uint8_t offset, uint8_t dout_pin, uint8_t in_pin_base) {
     pio_gpio_init(pio, dout_pin);
     pio_gpio_init(pio, in_pin_base);
     pio_gpio_init(pio, in_pin_base + 1);

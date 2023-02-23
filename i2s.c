@@ -28,9 +28,9 @@
 #include "i2s.pio.h"
 
 const i2s_config i2s_config_default = {
-  48000,
-  384, // 256,
-  24,
+  44100,
+  384, // 256, // 384, // 256,
+  24, // 32, // 24,
   4,
   0,
   1,
@@ -183,6 +183,32 @@ static void i2s_slave_program_init(PIO pio, const i2s_config* config, pio_i2s* i
     pio_sm_set_clkdiv_int_frac(pio, i2s->sm_din, clocks.sck_d, clocks.sck_f);
 }
 
+static void i2s_slave_lb_program_init(PIO pio, const i2s_config* config, pio_i2s* i2s) {
+    uint offset  = 0;
+    i2s->pio     = pio;
+    i2s->sm_mask = 0;
+
+    pio_i2s_clocks clocks;
+    calc_clocks(config, &clocks);
+
+    if (config->sck_enable) {
+        // SCK block
+        i2s->sm_sck = pio_claim_unused_sm(pio, true);
+        i2s->sm_mask |= (1u << i2s->sm_sck);
+        offset = pio_add_program(pio0, &i2s_sck_program);
+        i2s_sck_program_init(pio, i2s->sm_sck, offset, config->sck_pin);
+        pio_sm_set_clkdiv_int_frac(pio, i2s->sm_sck, clocks.sck_d, clocks.sck_f);
+    }
+
+    // Bi-Di I2S block, clocked with SCK
+    i2s->sm_din  = pio_claim_unused_sm(pio, true);
+    i2s->sm_dout = i2s->sm_din;
+    i2s->sm_mask |= (1u << i2s->sm_din);
+    offset = pio_add_program(pio0, &i2s_bidi_slave_lb_program);
+    i2s_bidi_slave_lb_program_init(pio, i2s->sm_din, offset, config->dout_pin, config->din_pin);
+    pio_sm_set_clkdiv_int_frac(pio, i2s->sm_din, clocks.sck_d, clocks.sck_f);
+}
+
 /* Initializes an I2S block (of 3 state machines) on the
  * designated PIO.
  *
@@ -236,6 +262,15 @@ void i2s_program_start_slaved(PIO pio, const i2s_config* config, void (*dma_hand
         panic("pio_i2s argument must be 8-byte aligned!");
     }
     i2s_slave_program_init(pio, config, i2s);
+    dma_double_buffer_init(i2s, dma_handler);
+    pio_enable_sm_mask_in_sync(i2s->pio, i2s->sm_mask);
+}
+
+void i2s_program_start_slaved_lb(PIO pio, const i2s_config* config, void (*dma_handler)(void), pio_i2s* i2s) {
+    if (((uint32_t)i2s & 0x7) != 0) {
+        panic("pio_i2s argument must be 8-byte aligned!");
+    }
+    i2s_slave_lb_program_init(pio, config, i2s);
     dma_double_buffer_init(i2s, dma_handler);
     pio_enable_sm_mask_in_sync(i2s->pio, i2s->sm_mask);
 }

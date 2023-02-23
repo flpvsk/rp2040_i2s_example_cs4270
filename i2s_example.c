@@ -50,6 +50,18 @@ const uint LED_PIN = PICO_DEFAULT_LED_PIN;
 
 static __attribute__((aligned(8))) pio_i2s i2s;
 
+// const int32_t MAX_INT = ((INT32_C(1)<<30)-1)*2+1;
+
+static uint32_t inc_wrap(uint32_t i, uint32_t max) {
+  if (i == max) return 0;
+  return i + 1;
+}
+
+uint32_t read_i = 0;
+uint32_t write_i = UINT8_MAX - 1;
+
+int32_t buffy[UINT8_MAX] = { 0 };
+
 static void process_audio(
     const int32_t* input,
     int32_t* output,
@@ -58,6 +70,19 @@ static void process_audio(
     // Just copy the input to the output
     for (size_t i = 0; i < num_frames * 2; i++) {
         output[i] = input[i];
+
+        // if (i % 2 == 0) {
+        //     output[i] = 0;
+        //     continue;
+        // }
+        // output[i] = 0.1 * INT32_MAX * (float)(((float) phase / div) - floor(phase / div));
+        // phase = inc_wrap(phase);
+
+        // buffy[write_i] = input[i];
+        // output[i] = buffy[read_i];
+
+        // read_i = inc_wrap(read_i, UINT8_MAX - 1);
+        // write_i = inc_wrap(write_i, UINT8_MAX - 1);
     }
 }
 
@@ -87,22 +112,25 @@ static void dma_i2s_in_handler(void) {
         );
     }
     dma_hw->ints0 = 1u << i2s.dma_ch_in_data;  // clear the IRQ
-    printf(
-        "dma callback complete:%p ...in: %p ...out: %p\n",
-        dma_addr,
-        i2s.input_buffer,
-        i2s.output_buffer
-    );
 }
 
 void blink_it() {
-  uint8_t i = 10;
+  uint8_t i = 3;
   while (i--) {
       gpio_put(LED_PIN, 1);
-      sleep_ms(10);
+      sleep_ms(100);
       gpio_put(LED_PIN, 0);
-      sleep_ms(10);
+      sleep_ms(100);
   }
+}
+
+void panic_on_err(int r) {
+  if (r < 0) {
+    blink_it();
+    panic("i2c write failed");
+  }
+
+  return;
 }
 
 int main() {
@@ -158,6 +186,21 @@ int main() {
       ),
     };
 
+    // uint8_t i2c_cmd_set_mode[2] = {
+    //   0x03,     // Mode control MAP
+    //   (
+    //     0 // clock divider 1 (single speed, master mode)
+    //   ),
+    // };
+
+    // uint8_t i2c_cmd_set_mode[2] = {
+    //   0x03,     // Mode control MAP
+    //   (
+    //     (1 << 1) |            // clock divider 1.5
+    //     (1 << 4) | (1 << 5)   // slave mode
+    //   ),
+    // };
+
     uint8_t i2c_cmd_codec_config[2] = {
       0x04,     // ADC & DAC control MAP
       (
@@ -187,6 +230,7 @@ int main() {
       0,        // Power up all
     };
 
+    sleep_ms(500);
     gpio_put(RESET_INV_PIN, 1); // enable codec
 
     int r;
@@ -198,6 +242,7 @@ int main() {
         false
     );
     printf("Power down: %d\n", r);
+    panic_on_err(r);
 
     sleep_ms(1);
 
@@ -209,6 +254,7 @@ int main() {
         false
     );
     printf("Mode: %d\n", r);
+    panic_on_err(r);
 
     sleep_ms(1);
 
@@ -230,6 +276,7 @@ int main() {
         false
     );
     printf("Codec: %d\n", r);
+    panic_on_err(r);
 
     r = i2c_write_blocking(
         I2C_PORT,
@@ -238,6 +285,7 @@ int main() {
         2,
         false
     );
+    panic_on_err(r);
 
     r = i2c_write_blocking(
         I2C_PORT,
@@ -247,6 +295,7 @@ int main() {
         false
     );
     printf("Vol: %d\n", r);
+    panic_on_err(r);
 
     sleep_ms(1);
 
@@ -277,6 +326,7 @@ int main() {
     // and then enable it after starting the I2S clocks,
     // below.
 
+
     // i2s_program_start_synched(
     //     pio0,
     //     &i2s_config_default,
@@ -284,7 +334,8 @@ int main() {
     //     &i2s
     // );
 
-    i2s_program_start_slaved(
+
+    i2s_program_start_slaved_lb(
         pio0,
         &i2s_config_default,
         dma_i2s_in_handler,
