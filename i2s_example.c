@@ -57,19 +57,48 @@ static uint32_t inc_wrap(uint32_t i, uint32_t max) {
   return i + 1;
 }
 
+void print_bin(uint32_t x) {
+  char bin_str[] = " 0000 0000 0000 0000 0000 0000 0000 0000";
+
+  // 5  -> 33
+  // 31 ->  0
+  int i = 0;
+  while (i < 39) {
+    int idx = 39 - ((i / 4) * 5 + i % 4);
+
+    if (x & 1) {
+      bin_str[idx] = '1';
+    } else {
+      bin_str[idx] = '0';
+    }
+
+    i += 1;
+    x = x >> 1;
+  }
+
+  puts(bin_str);
+}
+
 uint32_t read_i = 0;
 uint32_t write_i = UINT8_MAX - 1;
 
 int32_t buffy[UINT8_MAX] = { 0 };
 
 static void process_audio(
-    const int32_t* input,
-    int32_t* output,
+    const uint32_t* input,
+    uint32_t* output,
     size_t num_frames
 ) {
     // Just copy the input to the output
     for (size_t i = 0; i < num_frames * 2; i++) {
-        output[i] = input[i];
+        // zero-out 8 LSBs
+        output[i] = input[i] & ~((uint32_t)0x100 - 1);
+
+        if (read_i == 1 && i % 2 == 0) {
+          print_bin(input[i]);
+        }
+
+        // input[i] = 0;
 
         // if (i % 2 == 0) {
         //     output[i] = 0;
@@ -84,16 +113,19 @@ static void process_audio(
         // read_i = inc_wrap(read_i, UINT8_MAX - 1);
         // write_i = inc_wrap(write_i, UINT8_MAX - 1);
     }
+
+    read_i = inc_wrap(read_i, UINT16_MAX);
 }
 
 static void dma_i2s_in_handler(void) {
+    bool has_buf = false;
     /* We're double buffering using chained TCBs. By
      * checking which buffer the DMA is currently reading
      * from, we can identify which buffer it has just
      * finished reading (the completion of which has
      * triggered this interrupt).
      */
-    int32_t* dma_addr = *(int32_t**)dma_hw->ch[i2s.dma_ch_in_ctrl].read_addr;
+    uint32_t* dma_addr = *(uint32_t**)dma_hw->ch[i2s.dma_ch_in_ctrl].read_addr;
     if (dma_addr == i2s.input_buffer) {
         // It is inputting to the second buffer so we can
         // overwrite the first
@@ -102,7 +134,10 @@ static void dma_i2s_in_handler(void) {
             i2s.output_buffer,
             AUDIO_BUFFER_FRAMES
         );
-    } else {
+        has_buf = 1;
+    }
+
+    if (dma_addr == &i2s.input_buffer[STEREO_BUFFER_SIZE]) {
         // It is currently inputting the first buffer, so we
         // write to the second
         process_audio(
@@ -110,7 +145,13 @@ static void dma_i2s_in_handler(void) {
             &i2s.output_buffer[STEREO_BUFFER_SIZE],
             AUDIO_BUFFER_FRAMES
         );
+        has_buf = 1;
     }
+
+    if (!has_buf) {
+      puts("WARN");
+    }
+
     dma_hw->ints0 = 1u << i2s.dma_ch_in_data;  // clear the IRQ
 }
 

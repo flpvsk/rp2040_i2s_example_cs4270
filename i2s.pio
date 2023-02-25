@@ -138,10 +138,10 @@ public_entry_point:
   wait 0 pin 2                  ; wait for LRCK to be a left frame start
 start_l:
   wait 0 pin 1                  ;
-  ; pull noblock                  ;
-  ; push noblock                  ;
-  mov osr x
-  mov x isr
+  pull noblock                  ;
+  push noblock                  ;
+  ; mov osr x
+  ; mov x isr
   wait 1 pin 1                  ;
 loop_l:
   wait 0 pin 1                  ;
@@ -152,10 +152,10 @@ loop_l:
   jmp loop_l                    ;
 start_r:
   wait 0 pin 1                  ;
-  ; pull noblock                  ;
-  ; push noblock                  ;
-  mov osr y
-  mov y isr
+  pull noblock                  ;
+  push noblock                  ;
+  ; mov osr y
+  ; mov y isr
   wait 1 pin 1                  ;
 loop_r:
   wait 0 pin 1                  ;

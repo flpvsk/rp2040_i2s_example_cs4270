@@ -25,7 +25,7 @@
 #ifndef I2S_TEST_I2S_H
 #define I2S_TEST_I2S_H
 
-#define AUDIO_BUFFER_FRAMES 256 // 48
+#define AUDIO_BUFFER_FRAMES 48 // 256 // 48
 #define STEREO_BUFFER_SIZE  AUDIO_BUFFER_FRAMES * 2  // roughly 1ms, 48 L + R words
 
 typedef struct i2s_config {
@@ -63,10 +63,10 @@ typedef struct pio_i2s {
     uint       dma_ch_in_data;
     uint       dma_ch_out_ctrl;
     uint       dma_ch_out_data;
-    int32_t*   in_ctrl_blocks[2];  // Control blocks MUST have 8-byte alignment.
-    int32_t*   out_ctrl_blocks[2];
-    int32_t    input_buffer[STEREO_BUFFER_SIZE * 2];
-    int32_t    output_buffer[STEREO_BUFFER_SIZE * 2];
+    uint32_t*   in_ctrl_blocks[2];  // Control blocks MUST have 8-byte alignment.
+    uint32_t*   out_ctrl_blocks[2];
+    uint32_t    input_buffer[STEREO_BUFFER_SIZE * 2];
+    uint32_t    output_buffer[STEREO_BUFFER_SIZE * 2];
     i2s_config config;
 } pio_i2s;
 
