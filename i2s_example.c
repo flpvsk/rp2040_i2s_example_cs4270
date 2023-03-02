@@ -145,19 +145,19 @@ int main() {
     //   ),
     // };
 
-    // uint8_t i2c_cmd_set_mode[2] = {
-    //   0x03,     // Mode control MAP
-    //   (
-    //     0 // clock divider 1 (single speed, master mode)
-    //   ),
-    // };
-
     uint8_t i2c_cmd_set_mode[2] = {
       0x03,     // Mode control MAP
       (
-        (1 << 4) | (1 << 5)   // slave mode
+        0 // clock divider 1 (single speed, master mode)
       ),
     };
+
+    // uint8_t i2c_cmd_set_mode[2] = {
+    //   0x03,     // Mode control MAP
+    //   (
+    //     (1 << 4) | (1 << 5)   // slave mode
+    //   ),
+    // };
 
     uint8_t i2c_cmd_codec_config[2] = {
       0x04,     // ADC & DAC control MAP
@@ -285,20 +285,20 @@ int main() {
     // below.
 
 
-    i2s_program_start_synched(
-        pio0,
-        &i2s_config_default,
-        dma_i2s_in_handler,
-        &i2s
-    );
-
-
-    // i2s_program_start_slaved(
+    // i2s_program_start_synched(
     //     pio0,
     //     &i2s_config_default,
     //     dma_i2s_in_handler,
     //     &i2s
     // );
+
+
+    i2s_program_start_slaved(
+        pio0,
+        &i2s_config_default,
+        dma_i2s_in_handler,
+        &i2s
+    );
 
 
     puts("i2s_example started.");
