@@ -49,20 +49,40 @@ const uint LED_PIN = PICO_DEFAULT_LED_PIN;
 
 static __attribute__((aligned(8))) pio_i2s i2s;
 
-#define BUFFY_SIZE 12288
+#define BUFFY_SIZE 12288 / 8
+#define HALF_INT 1073741823
+
 int32_t buffy[BUFFY_SIZE];
 uint16_t buffy_read_idx = 0;
 uint16_t buffy_write_idx = BUFFY_SIZE - 1;
 
+float feedback = 0.97;
+
+const bool should_blink_led = false;
+
 static void process_audio(const int32_t* input, int32_t* output, size_t num_frames) {
     // Just copy the input to the output
     for (size_t i = 0; i < num_frames * 2; i++) {
-        buffy[buffy_write_idx] = input[i];
+        if (i % 2 == 1) {
+          output[i] = 0;
+          continue;
+        }
+
+        buffy[buffy_write_idx] = (1. - feedback * 0.6) * input[i] + feedback * buffy[buffy_write_idx];
+        //+ (int32_t) feedback * buffy[buffy_write_idx];
         output[i] = buffy[buffy_read_idx];
         // output[i] = 0;
 
         buffy_write_idx += 1;
         buffy_read_idx += 1;
+
+        if (buffy_write_idx == BUFFY_SIZE) {
+          buffy_write_idx = 0;
+        }
+
+        if (buffy_read_idx == BUFFY_SIZE) {
+          buffy_read_idx = 0;
+        }
     }
 }
 
@@ -319,10 +339,12 @@ int main() {
     // Blink the LED so we know we started everything correctly.
 
     while (true) {
-        gpio_put(LED_PIN, 1);
-        sleep_ms(250);
-        gpio_put(LED_PIN, 0);
-        sleep_ms(250);
+        if (should_blink_led) {
+          gpio_put(LED_PIN, 1);
+          sleep_ms(250);
+          gpio_put(LED_PIN, 0);
+          sleep_ms(250);
+        }
     }
 
     return 0;
